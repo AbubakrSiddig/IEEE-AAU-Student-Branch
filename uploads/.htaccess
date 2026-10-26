@@ -1,0 +1,22 @@
+# IEEE AAU SB Platform - Secure Uploads Directory
+# Disallow all executable scripts and direct code execution
+
+# 1. Turn off PHP engine
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+# 2. Deny access to dangerous executable extensions
+<FilesMatch "(?i)\.(php|phtml|php3|php4|php5|php7|phps|pht|phar|cgi|pl|exe|sh|py|bash|bat|cmd|env|ini|htaccess)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# 3. Disable directory listing and CGI execution
+Options -Indexes -ExecCGI
+
+# 4. Force default static handler
+SetHandler default-handler
