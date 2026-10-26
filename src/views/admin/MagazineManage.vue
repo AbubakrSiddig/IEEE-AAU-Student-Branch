@@ -582,7 +582,7 @@ async function deleteIssue(item) {
 
   const token = authService.token.value || '';
   try {
-    const res = await fetch(`./api.php?action=magazines&id=${item.id}`, {
+    const res = await fetch(`./api.php?action=magazines&id=${item.id}&token=${encodeURIComponent(token)}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`

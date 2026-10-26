@@ -497,7 +497,7 @@ const teamAnswersList = computed(() => {
 async function updateStatus(vol, status, notes = '') {
   const token = authService.token.value || '';
   try {
-    await fetch('./api.php?action=update_volunteer_status', {
+    await fetch(`./api.php?action=update_volunteer_status&token=${encodeURIComponent(token)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

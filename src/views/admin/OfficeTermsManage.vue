@@ -716,6 +716,9 @@ async function openEditModal(term) {
   } catch (e) {}
 
   termForm.value = { ...term };
+  const def = getDefaultPositions();
+  officePositions.value = def.filter(p => p.position_group === 'office');
+  coordinatorPositions.value = def.filter(p => p.position_group === 'coordinator');
   showModal.value = true;
 }
 

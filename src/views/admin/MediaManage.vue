@@ -629,7 +629,7 @@ async function deleteNews(item) {
   }
   const token = authService.token.value || '';
   try {
-    const res = await fetch(`./api.php?action=news&id=${item.id}`, {
+    const res = await fetch(`./api.php?action=news&id=${item.id}&token=${encodeURIComponent(token)}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -647,7 +647,7 @@ async function deleteArticle(item) {
   }
   const token = authService.token.value || '';
   try {
-    const res = await fetch(`./api.php?action=articles&id=${item.id}`, {
+    const res = await fetch(`./api.php?action=articles&id=${item.id}&token=${encodeURIComponent(token)}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });

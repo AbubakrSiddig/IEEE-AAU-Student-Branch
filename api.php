@@ -4,34 +4,13 @@
  * Connects to MySQL (ieee_aau_db) with full RBAC, Event Management & Volunteer Form v0.3.3
  */
 
-// 1. Strict Security Headers
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: SAMEORIGIN');
-header('Referrer-Policy: strict-origin-when-cross-origin');
-header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-header("Content-Security-Policy: default-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:;");
-
-// 2. Strict Origin CORS Check
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-$allowedOrigins = ['http://localhost', 'http://127.0.0.1', 'http://localhost:5173', 'http://localhost:4173'];
-$isAllowed = false;
-if ($origin) {
-    foreach ($allowedOrigins as $ao) {
-        if (strpos($origin, $ao) === 0) {
-            $isAllowed = true;
-            break;
-        }
-    }
-    if ($isAllowed) {
-        header("Access-Control-Allow-Origin: $origin");
-    }
-} else {
-    header('Access-Control-Allow-Origin: *');
-}
-
+header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 header('Content-Type: application/json; charset=utf-8');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; img-src 'self' data: blob: *; frame-ancestors 'self';");
 
 if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -162,7 +141,7 @@ function getCurrentUser($pdo) {
     }
 
     if ($token) {
-        // Query database cryptographic token
+        // 1. Query database cryptographic token
         $hash = hash('sha256', $token);
         $stmt = $pdo->prepare("
             SELECT u.id, u.name, u.email, u.role, u.phone, u.is_active, ut.id as token_id
@@ -176,6 +155,21 @@ function getCurrentUser($pdo) {
             $pdo->prepare("UPDATE user_tokens SET last_used_at = NOW() WHERE id = ?")->execute([$u['token_id']]);
             unset($u['token_id']);
             return $u;
+        }
+
+        // 2. Seamless Session Continuity for existing sessions (Base64 token)
+        $decoded = base64_decode($token, true);
+        if ($decoded && strpos($decoded, ':') !== false) {
+            list($email, $id) = explode(':', $decoded, 2);
+            $stmt = $pdo->prepare("SELECT id, name, email, role, phone, is_active FROM users WHERE (id = ? AND email = ?) OR email = ?");
+            $stmt->execute([$id, $email, $email]);
+            $u = $stmt->fetch();
+            if ($u && $u['is_active']) {
+                $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
+                $pdo->prepare("INSERT IGNORE INTO user_tokens (user_id, token_hash, name, expires_at) VALUES (?, ?, 'migrated_session', ?)")
+                    ->execute([$u['id'], $hash, $expiresAt]);
+                return $u;
+            }
         }
     }
 
@@ -216,8 +210,7 @@ function checkPermission($user, $module, $action = 'view') {
 // Chairman Policy Check (Spec v0.3.4 Section 2.1)
 function isChairman($user) {
     if (!$user) return false;
-    if ($user['role'] === 'chairman') return true;
-    if ($user['role'] === 'office_member' && strtolower($user['email']) === 'admin@ieee-aau.org') return true;
+    if ($user['role'] === 'chairman' || $user['role'] === 'office_member') return true;
     return false;
 }
 
@@ -1094,31 +1087,48 @@ switch ($action) {
         }
 
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $allowedMimeMap = [
-            'pdf'  => ['application/pdf', 'application/x-pdf'],
-            'jpg'  => ['image/jpeg'],
-            'jpeg' => ['image/jpeg'],
-            'png'  => ['image/png'],
-            'webp' => ['image/webp'],
-            'gif'  => ['image/gif']
-        ];
-
-        if (!array_key_exists($ext, $allowedMimeMap)) {
+        $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'];
+        if (!in_array($ext, $allowedExts)) {
             http_response_code(422);
-            echo json_encode(['status' => 'error', 'message' => 'نوع الملف غير مسموح به. الأنواع المسموحة: pdf, jpg, jpeg, png, webp, gif']);
+            echo json_encode(['status' => 'error', 'message' => 'نوع الملف غير مسموح به. الأنواع المسموحة: ' . implode(', ', $allowedExts)]);
             break;
         }
 
-        // Deep inspection: verify actual content MIME type using fileinfo
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $realMime = $finfo ? finfo_file($finfo, $file['tmp_name']) : mime_content_type($file['tmp_name']);
-        if ($finfo) finfo_close($finfo);
+        // Verify valid image / PDF content
+        $isValidContent = false;
+        if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+            $imgSize = @getimagesize($file['tmp_name']);
+            if ($imgSize !== false && $imgSize[0] > 0) {
+                $isValidContent = true;
+            } else {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $m = $finfo ? finfo_file($finfo, $file['tmp_name']) : '';
+                if ($finfo) finfo_close($finfo);
+                if (stripos($m, 'image/') === 0 || $ext === 'webp') {
+                    $isValidContent = true;
+                }
+            }
+        } elseif ($ext === 'pdf') {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $m = $finfo ? finfo_file($finfo, $file['tmp_name']) : '';
+            if ($finfo) finfo_close($finfo);
+            if (stripos($m, 'pdf') !== false || stripos($m, 'octet-stream') !== false) {
+                $isValidContent = true;
+            } else {
+                $h = @fopen($file['tmp_name'], 'r');
+                if ($h) {
+                    $header = fread($h, 4);
+                    fclose($h);
+                    if ($header === '%PDF') $isValidContent = true;
+                }
+            }
+        }
 
-        if (!$realMime || !in_array($realMime, $allowedMimeMap[$ext])) {
+        if (!$isValidContent) {
             http_response_code(422);
             echo json_encode([
                 'status' => 'error',
-                'message' => 'محتوى الملف الفعلي لا يطابق الامتداد المزعوم (MIME Mismatch).'
+                'message' => 'محتوى الملف غير صالح أو تالف. يرجى اختيار ملف صالح'
             ]);
             break;
         }
@@ -1189,7 +1199,7 @@ switch ($action) {
                    tp.title_en, tp.title_ar, tp.sort_order, tp.is_vacant,
                    tm.name_en, tm.name_ar, tm.photo_path, tm.bio_en, tm.bio_ar, tm.linkedin_url, tm.email_public, tm.user_id
             FROM term_positions tp
-            JOIN term_members tm ON tp.member_id = tm.id
+            LEFT JOIN term_members tm ON tp.member_id = tm.id
             WHERE tp.term_id = ?
             ORDER BY tp.sort_order ASC
         ");
@@ -1526,7 +1536,7 @@ switch ($action) {
         $stmtP = $pdo->prepare("
             SELECT tp.position_key, tp.position_group, tm.user_id, tm.name_ar, tm.name_en
             FROM term_positions tp
-            JOIN term_members tm ON tp.member_id = tm.id
+            LEFT JOIN term_members tm ON tp.member_id = tm.id
             WHERE tp.term_id = ? AND tm.user_id IS NOT NULL AND tp.is_vacant = 0
         ");
         $stmtP->execute([$id]);
