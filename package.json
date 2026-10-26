@@ -1,0 +1,31 @@
+{
+  "name": "ieee-aau-sb-platform",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "postbuild": "node -e \"const fs = require('fs'); if (!fs.existsSync('dist/uploads')) { try { require('child_process').execSync('cmd /c mklink /J dist\\\\uploads uploads'); } catch(e){} }\"",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "canvas-confetti": "^1.9.4",
+    "chart.js": "^4.4.8",
+    "file-saver": "^2.0.5",
+    "jspdf": "^2.5.2",
+    "jszip": "^3.10.1",
+    "lucide-vue-next": "^0.475.0",
+    "vue": "^3.5.13",
+    "vue-chartjs": "^5.3.2",
+    "vue-router": "^4.5.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.2",
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.1.0"
+  }
+}

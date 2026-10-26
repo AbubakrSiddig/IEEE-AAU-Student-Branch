@@ -1,0 +1,114 @@
+{
+    "applications": [
+        {
+            "id": "#001",
+            "name": "Ahmed Mohamed",
+            "email": "ahmed@aau.edu",
+            "major": "CS",
+            "status": "Pending",
+            "appliedOn": "Apr 13, 2025"
+        },
+        {
+            "id": "#002",
+            "name": "Sara Ali",
+            "email": "sara@aau.edu",
+            "major": "EE",
+            "status": "Accepted",
+            "appliedOn": "Apr 11, 2025"
+        },
+        {
+            "id": "#003",
+            "name": "Mohamed Hassan",
+            "email": "m.hassan@aau.edu",
+            "major": "CS",
+            "status": "Rejected",
+            "appliedOn": "Apr 10, 2025"
+        },
+        {
+            "id": "#004",
+            "name": "Fatima Ibrahim",
+            "email": "fatima@aau.edu",
+            "major": "CS",
+            "status": "Pending",
+            "appliedOn": "Apr 8, 2025"
+        }
+    ],
+    "members": [
+        {
+            "id": "#001",
+            "name": "Ahmed Mohamed",
+            "email": "ahmed@aau.edu",
+            "team": "Media",
+            "year": "3rd",
+            "status": "Active"
+        },
+        {
+            "id": "#002",
+            "name": "Sara Ali",
+            "email": "sara@aau.edu",
+            "team": "Events",
+            "year": "2nd",
+            "status": "Active"
+        },
+        {
+            "id": "#003",
+            "name": "Mohamed Hassan",
+            "email": "m.hassan@aau.edu",
+            "team": "Tech",
+            "year": "4th",
+            "status": "Active"
+        },
+        {
+            "id": "#004",
+            "name": "Fatima Ibrahim",
+            "email": "fatima@aau.edu",
+            "team": "Design",
+            "year": "2nd",
+            "status": "Active"
+        }
+    ],
+    "volunteers": [
+        {
+            "id": "V-101",
+            "name": "Hiba Babiker",
+            "email": "hiba.b@aau.edu",
+            "team": "Events",
+            "status": "Accepted",
+            "appliedOn": "Apr 14, 2025"
+        },
+        {
+            "id": "V-102",
+            "name": "Youssef Nader",
+            "email": "youssef.n@aau.edu",
+            "team": "Design",
+            "status": "Pending",
+            "appliedOn": "Apr 12, 2025"
+        }
+    ],
+    "events": [
+        {
+            "id": "EV-01",
+            "title": "AI & Future Technologies",
+            "date": "May 15, 2025",
+            "time": "10:00 AM",
+            "location": "AAU Main Hall",
+            "status": "Upcoming"
+        },
+        {
+            "id": "EV-02",
+            "title": "Web Development Workshop",
+            "date": "Apr 25, 2025",
+            "time": "09:00 AM",
+            "location": "Lab 2 - CS Dept",
+            "status": "Upcoming"
+        },
+        {
+            "id": "EV-03",
+            "title": "IEEE Day Celebration",
+            "date": "May 2, 2025",
+            "time": "04:00 PM",
+            "location": "Campus Garden",
+            "status": "Upcoming"
+        }
+    ]
+}
