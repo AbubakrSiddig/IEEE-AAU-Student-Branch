@@ -4,7 +4,31 @@
  * Connects to MySQL (ieee_aau_db) with full RBAC, Event Management & Volunteer Form v0.3.3
  */
 
-header('Access-Control-Allow-Origin: *');
+// 1. Strict Security Headers
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+header("Content-Security-Policy: default-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:;");
+
+// 2. Strict Origin CORS Check
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowedOrigins = ['http://localhost', 'http://127.0.0.1', 'http://localhost:5173', 'http://localhost:4173'];
+$isAllowed = false;
+if ($origin) {
+    foreach ($allowedOrigins as $ao) {
+        if (strpos($origin, $ao) === 0) {
+            $isAllowed = true;
+            break;
+        }
+    }
+    if ($isAllowed) {
+        header("Access-Control-Allow-Origin: $origin");
+    }
+} else {
+    header('Access-Control-Allow-Origin: *');
+}
+
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 header('Content-Type: application/json; charset=utf-8');
@@ -16,10 +40,32 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS
 
 date_default_timezone_set('Africa/Khartoum');
 
-$host = '127.0.0.1';
-$dbname = 'ieee_aau_db';
-$user = 'root';
-$pass = '';
+// 3. Environment Loader
+function loadEnvFile($path = __DIR__ . '/.env') {
+    if (!file_exists($path)) return;
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || strpos($line, '#') === 0) continue;
+        if (strpos($line, '=') !== false) {
+            list($key, $val) = explode('=', $line, 2);
+            $key = trim($key);
+            $val = trim($val, " \t\n\r\0\x0B\"'");
+            if (!array_key_exists($key, $_SERVER) && !array_key_exists($key, $_ENV)) {
+                putenv("$key=$val");
+                $_ENV[$key] = $val;
+                $_SERVER[$key] = $val;
+            }
+        }
+    }
+}
+loadEnvFile();
+
+$host = getenv('DB_HOST') ?: '127.0.0.1';
+$dbname = getenv('DB_DATABASE') ?: 'ieee_aau_db';
+$user = getenv('DB_USERNAME') ?: 'root';
+$pass = getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : '';
+$appDebug = (getenv('APP_DEBUG') === 'true');
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass, [
@@ -27,7 +73,9 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
 } catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => 'Database connection failed: ' . $e->getMessage()]);
+    http_response_code(500);
+    $msg = $appDebug ? ('Database connection failed: ' . $e->getMessage()) : 'Database service unavailable. Please contact administrator.';
+    echo json_encode(['status' => 'error', 'message' => $msg]);
     exit;
 }
 
@@ -36,7 +84,56 @@ function getJsonInput() {
     return json_decode(file_get_contents('php://input'), true) ?: [];
 }
 
-// Simple Session / Bearer Token User Auth Simulator
+// Rate Limiting Helper
+function getClientIp() {
+    return $_SERVER['HTTP_X_FORWARDED_FOR'] ?? ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+}
+
+function checkRateLimit($pdo, $actionKey, $maxAttempts = 5, $decaySeconds = 900) {
+    $ip = getClientIp();
+    $now = date('Y-m-d H:i:s');
+    $stmt = $pdo->prepare("SELECT attempts, last_attempt FROM rate_limits WHERE ip_address = ? AND action_key = ?");
+    $stmt->execute([$ip, $actionKey]);
+    $record = $stmt->fetch();
+
+    if ($record) {
+        $lastTime = strtotime($record['last_attempt']);
+        if (time() - $lastTime > $decaySeconds) {
+            $up = $pdo->prepare("UPDATE rate_limits SET attempts = 1, last_attempt = ? WHERE ip_address = ? AND action_key = ?");
+            $up->execute([$now, $ip, $actionKey]);
+            return true;
+        }
+        if ($record['attempts'] >= $maxAttempts) {
+            return false;
+        }
+        $up = $pdo->prepare("UPDATE rate_limits SET attempts = attempts + 1, last_attempt = ? WHERE ip_address = ? AND action_key = ?");
+        $up->execute([$now, $ip, $actionKey]);
+        return true;
+    } else {
+        $ins = $pdo->prepare("INSERT INTO rate_limits (ip_address, action_key, attempts, last_attempt) VALUES (?, ?, 1, ?)");
+        $ins->execute([$ip, $actionKey, $now]);
+        return true;
+    }
+}
+
+function resetRateLimit($pdo, $actionKey) {
+    $ip = getClientIp();
+    $del = $pdo->prepare("DELETE FROM rate_limits WHERE ip_address = ? AND action_key = ?");
+    $del->execute([$ip, $actionKey]);
+}
+
+// Cryptographic Bearer Token Helper
+function createAuthToken($pdo, $userId, $name = 'web_session') {
+    $plainToken = bin2hex(random_bytes(32));
+    $hash = hash('sha256', $plainToken);
+    $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
+
+    $stmt = $pdo->prepare("INSERT INTO user_tokens (user_id, token_hash, name, expires_at) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$userId, $hash, $name, $expiresAt]);
+    return $plainToken;
+}
+
+// Secure Bearer Token User Authentication (Cryptographic DB Token)
 function getCurrentUser($pdo) {
     $token = '';
 
@@ -59,26 +156,27 @@ function getCurrentUser($pdo) {
         }
     }
 
-    // 3. Query string or body fallback
+    // 3. Query string fallback (for file download/embed)
     if (!$token) {
         $token = $_GET['token'] ?? ($_POST['token'] ?? '');
     }
 
     if ($token) {
-        $decoded = base64_decode($token, true);
-        if ($decoded && strpos($decoded, ':') !== false) {
-            list($email, $id) = explode(':', $decoded, 2);
-            $stmt = $pdo->prepare("SELECT id, name, email, role, phone, is_active FROM users WHERE (id = ? AND email = ?) OR email = ?");
-            $stmt->execute([$id, $email, $email]);
-            $u = $stmt->fetch();
-            if ($u) return $u;
-        }
-
-        // Direct ID or Email fallback
-        $stmt = $pdo->prepare("SELECT id, name, email, role, phone, is_active FROM users WHERE id = ? OR email = ?");
-        $stmt->execute([$token, $token]);
+        // Query database cryptographic token
+        $hash = hash('sha256', $token);
+        $stmt = $pdo->prepare("
+            SELECT u.id, u.name, u.email, u.role, u.phone, u.is_active, ut.id as token_id
+            FROM user_tokens ut
+            JOIN users u ON ut.user_id = u.id
+            WHERE ut.token_hash = ? AND ut.expires_at > NOW() AND u.is_active = 1
+        ");
+        $stmt->execute([$hash]);
         $u = $stmt->fetch();
-        if ($u) return $u;
+        if ($u) {
+            $pdo->prepare("UPDATE user_tokens SET last_used_at = NOW() WHERE id = ?")->execute([$u['token_id']]);
+            unset($u['token_id']);
+            return $u;
+        }
     }
 
     return null;
@@ -288,6 +386,15 @@ switch ($action) {
     // 3. AUTHENTICATION & USER ACCOUNTS (CR v0.3.1)
     // ==========================================
     case 'login':
+        if (!checkRateLimit($pdo, 'login', 5, 900)) {
+            http_response_code(429);
+            echo json_encode([
+                'status' => 'error', 
+                'message' => 'تم تجاوز الحد الأقصى لمحاولات تسجيل الدخول (5 محاولات). يرجى الانتظار 15 دقيقة قبل المحاولة مرة أخرى.'
+            ]);
+            break;
+        }
+
         $input = getJsonInput();
         $email = trim($input['email'] ?? '');
         $password = $input['password'] ?? '';
@@ -297,7 +404,8 @@ switch ($action) {
         $u = $stmt->fetch();
 
         if ($u && password_verify($password, $u['password'])) {
-            $token = base64_encode($u['email'] . ':' . $u['id']);
+            resetRateLimit($pdo, 'login');
+            $token = createAuthToken($pdo, $u['id'], 'web_login');
             unset($u['password']);
             
             // Log activity
@@ -317,6 +425,15 @@ switch ($action) {
         break;
 
     case 'register':
+        if (!checkRateLimit($pdo, 'register', 5, 3600)) {
+            http_response_code(429);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'تم تجاوز الحد المسموح به لإنشاء الحسابات من هذا الجهاز. يرجى المحاولة لاحقاً.'
+            ]);
+            break;
+        }
+
         $input = getJsonInput();
         $name = trim($input['name'] ?? '');
         $email = trim($input['email'] ?? '');
@@ -326,6 +443,18 @@ switch ($action) {
         if (!$name || !$email || !$password) {
             http_response_code(422);
             echo json_encode(['status' => 'error', 'message' => 'الاسم والبريد الإلكتروني وكلمة المرور مطلوبة']);
+            break;
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'صيغة البريد الإلكتروني غير صحيحة']);
+            break;
+        }
+
+        if (strlen($password) < 8) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'كلمة المرور يجب ألا تقل عن 8 أحرف']);
             break;
         }
 
@@ -343,7 +472,7 @@ switch ($action) {
         $stmt->execute([$name, $email, $hash, $phone]);
         $newId = $pdo->lastInsertId();
 
-        $token = base64_encode($email . ':' . $newId);
+        $token = createAuthToken($pdo, $newId, 'web_registration');
         echo json_encode([
             'status' => 'success',
             'token' => $token,
@@ -355,6 +484,24 @@ switch ($action) {
                 'phone' => $phone
             ]
         ]);
+        break;
+
+    case 'logout':
+        $token = '';
+        $headers = function_exists('getallheaders') ? getallheaders() : [];
+        foreach ($headers as $k => $v) {
+            if (strtolower($k) === 'authorization' && preg_match('/Bearer\s+(\S+)/i', $v, $m)) {
+                $token = $m[1];
+                break;
+            }
+        }
+        if (!$token) {
+            $token = $_GET['token'] ?? ($_POST['token'] ?? '');
+        }
+        if ($token) {
+            $pdo->prepare("DELETE FROM user_tokens WHERE token_hash = ?")->execute([hash('sha256', $token)]);
+        }
+        echo json_encode(['status' => 'success', 'message' => 'تم تسجيل الخروج بنجاح']);
         break;
 
     case 'me':
@@ -382,6 +529,30 @@ switch ($action) {
         $params = [$name, $phone];
 
         if (!empty($input['password'])) {
+            $currentPassword = $input['current_password'] ?? '';
+            if (!$currentPassword) {
+                http_response_code(422);
+                echo json_encode(['status' => 'error', 'message' => 'كلمة المرور الحالية مطلوبة لتحديث كلمة المرور']);
+                break;
+            }
+
+            // Verify current password against database
+            $uStmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+            $uStmt->execute([$user['id']]);
+            $existingHash = $uStmt->fetchColumn();
+
+            if (!password_verify($currentPassword, $existingHash)) {
+                http_response_code(422);
+                echo json_encode(['status' => 'error', 'message' => 'كلمة المرور الحالية غير صحيحة']);
+                break;
+            }
+
+            if (strlen($input['password']) < 8) {
+                http_response_code(422);
+                echo json_encode(['status' => 'error', 'message' => 'كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف']);
+                break;
+            }
+
             $sql .= ", password = ?";
             $params[] = password_hash($input['password'], PASSWORD_BCRYPT);
         }
@@ -498,6 +669,24 @@ switch ($action) {
     // 5. VOLUNTEER SPEC v0.3.3 API
     // ==========================================
     case 'volunteer_submit':
+        if (!checkRateLimit($pdo, 'volunteer_submit', 10, 3600)) {
+            http_response_code(429);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'تجاوزت الحد المسموح به لإرسال طلبات التطوع. يرجى الانتظار ساعة قبل المحاولة مجدداً.'
+            ]);
+            break;
+        }
+
+        // Validate recruitment campaign deadline & status
+        $camp = $pdo->query("SELECT id, opens_at, closes_at, status FROM recruitment_campaigns WHERE status = 'active' ORDER BY id DESC LIMIT 1")->fetch();
+        $now = date('Y-m-d H:i:s');
+        if (!$camp || $now < $camp['opens_at'] || $now > $camp['closes_at']) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'حملة التطوع مغلقة حالياً أو انتهت فترة التقديم المحددة']);
+            break;
+        }
+
         $user = getCurrentUser($pdo);
         $input = getJsonInput();
 
@@ -519,12 +708,13 @@ switch ($action) {
         $id = 'VOL-' . date('y') . '-' . rand(1000, 9999);
 
         $stmt = $pdo->prepare("INSERT INTO volunteer_applications (
-            id, user_id, full_name, university, college, major, batch, email, phone, whatsapp, team_id, specialty_id, general_answers, team_answers, why_choose_you, terms_version, terms_accepted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            id, user_id, campaign_id, full_name, university, college, major, batch, email, phone, whatsapp, team_id, specialty_id, general_answers, team_answers, why_choose_you, terms_version, terms_accepted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
 
         $stmt->execute([
             $id,
             $user ? $user['id'] : null,
+            $camp['id'],
             $fullName,
             $input['university'] ?? 'جامعة الزعيم الأزهري',
             $input['college'] ?? '',
@@ -585,6 +775,25 @@ switch ($action) {
         $id = $input['id'] ?? '';
         $newStatus = $input['status'] ?? 'new';
         $notes = $input['notes'] ?? '';
+
+        // IDOR & Scope Protection: If coordinator, verify application belongs to their team!
+        $role = $user['role'];
+        if ($role !== 'office_member' && $role !== 'hr') {
+            $map = [
+                'programs_coordinator' => 'program',
+                'magazine_coordinator' => 'magazine',
+                'media_coordinator' => 'media'
+            ];
+            $allowedTeam = $map[$role] ?? 'none';
+            $chkStmt = $pdo->prepare("SELECT team_id FROM volunteer_applications WHERE id = ?");
+            $chkStmt->execute([$id]);
+            $app = $chkStmt->fetch();
+            if (!$app || $app['team_id'] !== $allowedTeam) {
+                http_response_code(403);
+                echo json_encode(['status' => 'error', 'message' => 'غير مصرح لك بتعديل طلبات متطوعي فريق آخر (IDOR Protection)']);
+                break;
+            }
+        }
 
         $stmt = $pdo->prepare("UPDATE volunteer_applications SET status = ?, reviewer_notes = ? WHERE id = ?");
         $stmt->execute([$newStatus, $notes, $id]);
@@ -881,34 +1090,67 @@ switch ($action) {
         $folder = preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['folder'] ?? 'media');
         $targetDir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder;
         if (!is_dir($targetDir)) {
-            @mkdir($targetDir, 0777, true);
+            @mkdir($targetDir, 0755, true);
         }
 
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'];
-        if (!in_array($ext, $allowedExts)) {
+        $allowedMimeMap = [
+            'pdf'  => ['application/pdf', 'application/x-pdf'],
+            'jpg'  => ['image/jpeg'],
+            'jpeg' => ['image/jpeg'],
+            'png'  => ['image/png'],
+            'webp' => ['image/webp'],
+            'gif'  => ['image/gif']
+        ];
+
+        if (!array_key_exists($ext, $allowedMimeMap)) {
             http_response_code(422);
-            echo json_encode(['status' => 'error', 'message' => 'نوع الملف غير مسموح به. الأنواع المسموحة: ' . implode(', ', $allowedExts)]);
+            echo json_encode(['status' => 'error', 'message' => 'نوع الملف غير مسموح به. الأنواع المسموحة: pdf, jpg, jpeg, png, webp, gif']);
             break;
         }
 
-        $newFileName = time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        // Deep inspection: verify actual content MIME type using fileinfo
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $realMime = $finfo ? finfo_file($finfo, $file['tmp_name']) : mime_content_type($file['tmp_name']);
+        if ($finfo) finfo_close($finfo);
+
+        if (!$realMime || !in_array($realMime, $allowedMimeMap[$ext])) {
+            http_response_code(422);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'محتوى الملف الفعلي لا يطابق الامتداد المزعوم (MIME Mismatch).'
+            ]);
+            break;
+        }
+
+        // File size limits: PDF max 15MB, Images max 5MB
+        $maxBytes = ($ext === 'pdf') ? (15 * 1024 * 1024) : (5 * 1024 * 1024);
+        if ($file['size'] > $maxBytes) {
+            http_response_code(422);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'حجم الملف يتجاوز الحد المسموح به (' . ($ext === 'pdf' ? '15MB' : '5MB') . ')'
+            ]);
+            break;
+        }
+
+        $newFileName = time() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
         $destination = $targetDir . DIRECTORY_SEPARATOR . $newFileName;
 
         if (move_uploaded_file($file['tmp_name'], $destination)) {
             // Also ensure copy exists in dist/uploads so both URLs resolve
             $distTarget = __DIR__ . DIRECTORY_SEPARATOR . 'dist' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder;
             if (!is_dir($distTarget)) {
-                @mkdir($distTarget, 0777, true);
+                @mkdir($distTarget, 0755, true);
             }
             @copy($destination, $distTarget . DIRECTORY_SEPARATOR . $newFileName);
 
             $webPath = 'uploads/' . $folder . '/' . $newFileName;
             echo json_encode([
                 'status' => 'success',
-                'message' => 'تم رفع الملف بنجاح',
+                'message' => 'تم رفع الملف بنجاح وأمان',
                 'url' => $webPath,
-                'fileName' => $file['name'],
+                'fileName' => htmlspecialchars($file['name'], ENT_QUOTES, 'UTF-8'),
                 'size' => $file['size']
             ]);
         } else {
