@@ -126,9 +126,12 @@ async function handleLogin() {
   if (res.success) {
     emit('notify', props.lang === 'ar' ? `مرحباً بك مجدداً ${res.user.name}!` : `Welcome back, ${res.user.name}!`, 'success');
     
-    // Redirect logic: if redirect query param exists, go there; else if admin -> /admin, else -> /
-    const redirectUrl = route.query.redirect || res.redirect || '/';
-    router.push(redirectUrl);
+    // Open Redirect Protection: sanitize redirect query param
+    let target = route.query.redirect || res.redirect || '/';
+    if (typeof target !== 'string' || !target.startsWith('/') || target.startsWith('//') || target.startsWith('/\\') || target.includes('://')) {
+      target = (res.user && res.user.role === 'registered_user') ? '/' : '/admin';
+    }
+    router.push(target);
   } else {
     errorMsg.value = res.message;
   }
