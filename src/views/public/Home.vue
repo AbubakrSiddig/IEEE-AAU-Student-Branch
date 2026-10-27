@@ -229,48 +229,100 @@
       </div>
     </section>
 
-    <!-- Magazine & Publication Teaser (Matching Screen 5) -->
+    <!-- Magazine & Publications Section (Latest 3 Issues) -->
     <section class="bg-slate-100/70 dark:bg-slate-800/40 py-16 transition-colors">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 sm:p-12 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col lg:flex-row items-center gap-8">
-          <div class="w-48 sm:w-56 h-72 bg-gradient-to-tr from-blue-900 to-indigo-800 rounded-xl shadow-xl flex-shrink-0 flex items-center justify-center p-6 text-center text-white relative overflow-hidden group">
-            <img 
-              v-if="currentLatestMagazine.cover"
-              :src="currentLatestMagazine.cover" 
-              alt="Magazine Cover" 
-              class="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:scale-105 transition-transform"
-            />
-            <div class="relative z-10 bg-black/40 p-3 rounded-xl backdrop-blur-xs">
-              <div class="text-xs uppercase font-bold tracking-widest text-blue-300">IEEE AAU</div>
-              <div class="text-lg font-black mt-1">MAGAZINE</div>
-              <div class="text-[11px] mt-2 text-blue-100 font-semibold">{{ currentLatestMagazine.volume }}</div>
-            </div>
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        <!-- Section Header -->
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-md">
+              {{ lang === 'ar' ? 'إصدارات الفرع' : 'Branch Publications' }}
+            </span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-2 flex items-center gap-2">
+              <BookOpen class="w-7 h-7 text-blue-900 dark:text-blue-400" />
+              <span>{{ lang === 'ar' ? 'أحدث أعداد مجلة IEEE AAU' : 'Latest IEEE AAU Magazine Issues' }}</span>
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+              {{ lang === 'ar' ? 'تصفّح أحدث الإصدارات الدورية والأبحاث والابتكارات الطلابية الصادرة عن الفرع' : 'Explore the latest periodic publications, student research, and innovation articles.' }}
+            </p>
           </div>
 
-          <div class="flex-1 space-y-4">
-            <span class="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-md">
-              {{ t('latestIssue') }}
-            </span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
-              {{ currentLatestMagazine.title }}
-            </h2>
-            <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
-              {{ currentLatestMagazine.description }}
-            </p>
-            <div class="flex flex-wrap items-center gap-4 pt-2">
+          <router-link 
+            to="/magazine" 
+            class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-900 dark:text-blue-400 hover:underline"
+          >
+            <span>{{ lang === 'ar' ? 'عرض جميع الأعداد' : 'View All Issues' }}</span>
+            <ArrowRight class="w-4 h-4" />
+          </router-link>
+        </div>
+
+        <!-- 3 Magazine Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+          <div 
+            v-for="issue in displayedMagazines" 
+            :key="issue.id"
+            class="bg-white dark:bg-slate-800 rounded-3xl p-5 border border-slate-200/90 dark:border-slate-700/80 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group"
+          >
+            <!-- 1. Pure Clean Cover Image (No distorting text overlays) -->
+            <div 
+              @click="viewMagazine(issue)"
+              class="relative aspect-[3/4] w-full rounded-2xl overflow-hidden bg-slate-900 shadow-md border border-slate-200/60 dark:border-slate-700/60 mb-4 cursor-pointer"
+            >
+              <img 
+                v-if="issue.cover"
+                :src="resolveCover(issue.cover)" 
+                :alt="issue.title" 
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                loading="lazy"
+              />
+              <div v-else class="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-tr from-blue-950 to-indigo-900 text-white text-center">
+                <BookOpen class="w-12 h-12 text-blue-300/80 mb-2" />
+                <span class="text-xs font-bold text-blue-200">{{ issue.volume }}</span>
+              </div>
+            </div>
+
+            <!-- 2. Clean Typography & Issue Meta Below Cover -->
+            <div class="space-y-1.5 flex-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-blue-900 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md text-[11px]">
+                  {{ issue.volume }}
+                </span>
+                <span class="text-slate-400 dark:text-slate-500 font-medium text-[11px]">
+                  {{ issue.published_date || issue.year }}
+                </span>
+              </div>
+              <h3 
+                class="font-extrabold text-slate-900 dark:text-white text-base line-clamp-1 group-hover:text-blue-900 dark:group-hover:text-blue-400 transition-colors pt-1"
+                :title="issue.title"
+              >
+                {{ issue.title }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                {{ issue.description || (lang === 'ar' ? 'إصدار علمي وثقافي مميز يسلّط الضوء على الابتكارات والمشاريع الطلابية.' : 'Special scientific publication highlighting student innovations and technical projects.') }}
+              </p>
+            </div>
+
+            <!-- 3. Dual Action Buttons: View & Download -->
+            <div class="pt-4 mt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center gap-2">
+              <!-- View Button -->
               <button 
-                @click="downloadLatestPDF"
-                class="px-6 py-2.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm flex items-center gap-2"
+                @click="viewMagazine(issue)"
+                class="flex-1 py-2 px-3 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-900 dark:text-blue-300 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                :title="lang === 'ar' ? 'عرض المجلة' : 'View Magazine'"
               >
-                <Download class="w-4 h-4" />
-                <span>{{ t('downloadPDF') }}</span>
+                <Eye class="w-3.5 h-3.5" />
+                <span>{{ lang === 'ar' ? 'عرض' : 'View' }}</span>
               </button>
-              <router-link 
-                to="/magazine" 
-                class="px-6 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+
+              <!-- Download Button -->
+              <button 
+                @click="downloadMagazine(issue)"
+                class="flex-1 py-2 px-3 bg-blue-900 hover:bg-blue-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5"
+                :title="lang === 'ar' ? 'تنزيل ملف PDF' : 'Download PDF'"
               >
-                {{ t('pastIssues') }}
-              </router-link>
+                <Download class="w-3.5 h-3.5" />
+                <span>{{ lang === 'ar' ? 'تنزيل' : 'Download' }}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -349,7 +401,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { ArrowRight, Calendar, CalendarPlus, Clock, MapPin, Download, User } from 'lucide-vue-next';
+import { ArrowRight, Calendar, CalendarPlus, Clock, MapPin, Download, User, Eye, BookOpen } from 'lucide-vue-next';
 import Countdown from '../../components/Countdown.vue';
 import { storageService } from '../../services/storage';
 import { downloadTermsPDF } from '../../services/pdfExport';
@@ -371,7 +423,14 @@ const upcomingEvent = ref(null);
 const eventState = ref('upcoming');
 const serverTime = ref('');
 const officeMembersSummary = ref([]);
-const dynamicLatestMagazine = ref(null);
+const latestMagazines = ref([]);
+
+function resolveCover(path) {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  if (path.startsWith('/')) return '.' + path;
+  return './' + path;
+}
 
 const allNews = storageService.getNews();
 const latestNews = computed(() => allNews.slice(0, 3));
@@ -382,11 +441,9 @@ async function fetchLatestMagazine() {
     if (res.ok) {
       const data = await res.json();
       if (data.status === 'success' && Array.isArray(data.data) && data.data.length > 0) {
-        // Find latest published issue (ordered by id DESC in backend)
-        const latest = data.data.find(m => m.status === 'published') || data.data[0];
-        if (latest) {
-          dynamicLatestMagazine.value = latest;
-        }
+        // Filter published and slice latest 3 issues
+        const published = data.data.filter(m => m.status === 'published');
+        latestMagazines.value = (published.length > 0 ? published : data.data).slice(0, 3);
       }
     }
   } catch (e) {
@@ -394,9 +451,42 @@ async function fetchLatestMagazine() {
   }
 }
 
-const currentLatestMagazine = computed(() => {
-  return dynamicLatestMagazine.value || storageService.getMagazines().latest;
+const displayedMagazines = computed(() => {
+  if (latestMagazines.value && latestMagazines.value.length > 0) {
+    return latestMagazines.value;
+  }
+  const local = storageService.getMagazines();
+  const list = [local.latest, ...(local.past || [])].filter(Boolean);
+  return list.slice(0, 3);
 });
+
+function viewMagazine(issue) {
+  const fileUrl = issue.file_url || issue.fileUrl;
+  if (fileUrl && fileUrl !== '#') {
+    window.open(resolveCover(fileUrl), '_blank');
+  } else if (issue.cover) {
+    window.open(resolveCover(issue.cover), '_blank');
+  } else {
+    emit('notify', props.lang === 'ar' ? 'ملف المجلة غير متوفر حالياً' : 'Magazine file currently unavailable', 'info');
+  }
+}
+
+function downloadMagazine(issue) {
+  const fileUrl = issue.file_url || issue.fileUrl;
+  if (fileUrl && fileUrl !== '#') {
+    const link = document.createElement('a');
+    link.href = resolveCover(fileUrl);
+    link.download = `${(issue.title || 'IEEE_AAU_Magazine').replace(/\s+/g, '_')}.pdf`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    emit('notify', props.lang === 'ar' ? 'بدأ تنزيل المجلة...' : 'Magazine download started...', 'success');
+  } else {
+    downloadTermsPDF('v2.0');
+    emit('notify', props.lang === 'ar' ? 'بدأ تنزيل نسخة تجريبية من المجلة...' : 'Sample magazine download started...', 'success');
+  }
+}
 
 async function fetchTeamSummary() {
   try {

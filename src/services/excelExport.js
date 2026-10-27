@@ -1,14 +1,41 @@
 import * as XLSX from 'xlsx';
 
+/**
+ * Sanitize value to prevent Excel Formula Injection (CWE-1236 / CSV Injection)
+ * Formulas starting with =, +, -, @, \t, \r could execute arbitrary code when opened in spreadsheet software.
+ */
+function sanitizeCell(val) {
+  if (typeof val === 'string') {
+    if (/^[=+\-@\t\r]/.test(val.trim())) {
+      return "'" + val;
+    }
+    return val;
+  }
+  return val;
+}
+
+function sanitizeData(data) {
+  if (!Array.isArray(data)) return [];
+  return data.map(row => {
+    if (!row || typeof row !== 'object') return row;
+    const cleanRow = {};
+    for (const [k, v] of Object.entries(row)) {
+      cleanRow[k] = sanitizeCell(v);
+    }
+    return cleanRow;
+  });
+}
+
 export function exportToExcel(data, fileName = 'export', sheetName = 'Sheet1') {
   try {
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    const safeData = sanitizeData(data);
+    const worksheet = XLSX.utils.json_to_sheet(safeData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     
     // Auto-fit column widths
     const maxProps = [];
-    data.forEach(item => {
+    safeData.forEach(item => {
       Object.keys(item).forEach((key, i) => {
         const valLen = String(item[key] || '').length;
         const keyLen = String(key).length;
@@ -26,7 +53,8 @@ export function exportToExcel(data, fileName = 'export', sheetName = 'Sheet1') {
 }
 
 export function generateExcelBuffer(data, sheetName = 'Sheet1') {
-  const worksheet = XLSX.utils.json_to_sheet(data);
+  const safeData = sanitizeData(data);
+  const worksheet = XLSX.utils.json_to_sheet(safeData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });

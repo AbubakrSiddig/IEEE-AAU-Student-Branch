@@ -93,7 +93,15 @@ export const authService = {
     localStorage.setItem('ieee_aau_user', JSON.stringify(user));
   },
 
-  logout() {
+  async logout() {
+    try {
+      if (currentToken.value) {
+        await fetch('./api.php?action=logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentToken.value}` }
+        });
+      }
+    } catch (e) {}
     currentUser.value = null;
     currentToken.value = null;
     localStorage.removeItem('ieee_aau_token');

@@ -11,3 +11,10 @@
     php_value max_execution_time 300
     php_value memory_limit 128M
 </IfModule>
+
+# Pass Authorization header to PHP scripts in Apache / XAMPP
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+</IfModule>

@@ -426,7 +426,7 @@ async function saveEvent() {
   const token = localStorage.getItem('ieee_aau_token') || '';
 
   try {
-    const res = await fetch(`./api.php?action=events${editId.value ? '&id=' + editId.value : ''}`, {
+    const res = await fetch(`./api.php?action=events${editId.value ? '&id=' + editId.value : ''}&token=${encodeURIComponent(token)}`, {
       method: editId.value ? 'PUT' : 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -473,7 +473,7 @@ async function deleteEvent(id) {
   if (confirm(props.lang === 'ar' ? `هل أنت متأكد من حذف الفعالية ${id}؟` : `Delete event ${id}?`)) {
     const token = localStorage.getItem('ieee_aau_token') || '';
     try {
-      await fetch(`./api.php?action=events&id=${id}`, {
+      await fetch(`./api.php?action=events&id=${id}&token=${encodeURIComponent(token)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
