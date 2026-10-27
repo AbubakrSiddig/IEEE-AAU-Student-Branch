@@ -7,3 +7,5 @@ uploads/*
 .DS_Store
 Thumbs.db
 FILE/
+
+deployment_package.zip
