@@ -73,17 +73,15 @@
         </div>
 
         <!-- 1. Executive Leadership: Chairman & Vice Chair (Row 1 - 2 Columns) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
           <div 
             v-for="member in topTwoOffice" 
             :key="member.position_id"
             @click="openMemberModal(member)"
-            class="bg-gradient-to-b from-blue-900 to-[#0B192C] text-white rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-4 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-blue-600/40 relative overflow-hidden group flex flex-col justify-between"
+            class="bg-white dark:bg-slate-800 rounded-3xl p-6 border-2 border-blue-600/30 dark:border-blue-500/30 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 text-center space-y-4 cursor-pointer group flex flex-col justify-between"
           >
-            <div class="absolute -right-12 -top-12 w-36 h-36 bg-blue-500/20 rounded-full blur-2xl"></div>
-            
             <!-- Photo or Fallback Avatar -->
-            <div class="relative w-28 h-28 sm:w-32 sm:h-32 mx-auto rounded-full overflow-hidden border-4 border-white/20 shadow-lg group-hover:scale-105 transition-transform duration-300 bg-slate-800 flex items-center justify-center flex-shrink-0">
+            <div class="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-blue-500/40 dark:border-blue-400/40 shadow-sm group-hover:scale-105 transition-transform duration-300 bg-slate-100 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
               <img 
                 v-if="member.photo_path" 
                 :src="resolvePhoto(member.photo_path)" 
@@ -91,33 +89,35 @@
                 class="w-full h-full object-cover"
                 loading="lazy"
               />
-              <User v-else class="w-14 h-14 text-blue-300/80" />
+              <User v-else class="w-12 h-12 text-slate-400 dark:text-slate-500" />
             </div>
 
             <!-- Titles & Name -->
             <div class="space-y-1 flex-1">
               <span 
-                class="inline-block px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase shadow-xs"
-                :class="member.position_key === 'chairman' ? 'bg-amber-400 text-slate-950' : 'bg-blue-400 text-slate-950'"
+                class="inline-block px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider"
+                :class="member.position_key === 'chairman' 
+                  ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700' 
+                  : 'bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300 border border-blue-200 dark:border-blue-800'"
               >
                 {{ member.position_key === 'chairman' ? '👑 ' : '⭐ ' }}{{ lang === 'ar' ? member.title_ar : member.title_en }}
               </span>
-              <h3 class="text-xl sm:text-2xl font-black text-white pt-1">
+              <h3 class="font-extrabold text-slate-900 dark:text-white text-base">
                 {{ lang === 'ar' ? (member.name_ar || member.name_en) : (member.name_en || member.name_ar) }}
               </h3>
-              <p class="text-xs text-blue-200 line-clamp-2 pt-1 font-normal max-w-sm mx-auto">
+              <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
                 {{ lang === 'ar' ? member.bio_ar : member.bio_en }}
               </p>
             </div>
 
             <!-- Social Links -->
-            <div class="flex items-center justify-center gap-3 pt-2 text-white/80">
+            <div class="flex items-center justify-center gap-2 pt-1 text-slate-400">
               <a 
                 v-if="member.linkedin_url" 
                 :href="member.linkedin_url" 
                 target="_blank" 
                 @click.stop
-                class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                class="p-1.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 title="LinkedIn"
               >
                 <Linkedin class="w-4 h-4" />
@@ -126,7 +126,7 @@
                 v-if="member.email_public" 
                 :href="'mailto:' + member.email_public" 
                 @click.stop
-                class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                class="p-1.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 title="Email"
               >
                 <Mail class="w-4 h-4" />
