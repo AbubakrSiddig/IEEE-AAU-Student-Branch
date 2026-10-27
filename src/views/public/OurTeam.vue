@@ -72,20 +72,22 @@
           </p>
         </div>
 
-        <!-- 1. Chairman (Featured Prominently in Top/Center Row) -->
-        <div v-if="chairman" class="max-w-md mx-auto">
+        <!-- 1. Executive Leadership: Chairman & Vice Chair (Row 1 - 2 Columns) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           <div 
-            @click="openMemberModal(chairman)"
-            class="bg-gradient-to-b from-blue-900 to-[#0B192C] text-white rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-4 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-blue-600/40 relative overflow-hidden group"
+            v-for="member in topTwoOffice" 
+            :key="member.position_id"
+            @click="openMemberModal(member)"
+            class="bg-gradient-to-b from-blue-900 to-[#0B192C] text-white rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-4 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-blue-600/40 relative overflow-hidden group flex flex-col justify-between"
           >
             <div class="absolute -right-12 -top-12 w-36 h-36 bg-blue-500/20 rounded-full blur-2xl"></div>
             
             <!-- Photo or Fallback Avatar -->
-            <div class="relative w-28 h-28 sm:w-32 sm:h-32 mx-auto rounded-full overflow-hidden border-4 border-white/20 shadow-lg group-hover:scale-105 transition-transform duration-300 bg-slate-800 flex items-center justify-center">
+            <div class="relative w-28 h-28 sm:w-32 sm:h-32 mx-auto rounded-full overflow-hidden border-4 border-white/20 shadow-lg group-hover:scale-105 transition-transform duration-300 bg-slate-800 flex items-center justify-center flex-shrink-0">
               <img 
-                v-if="chairman.photo_path" 
-                :src="resolvePhoto(chairman.photo_path)" 
-                :alt="chairman.name_en"
+                v-if="member.photo_path" 
+                :src="resolvePhoto(member.photo_path)" 
+                :alt="member.name_en"
                 class="w-full h-full object-cover"
                 loading="lazy"
               />
@@ -93,34 +95,39 @@
             </div>
 
             <!-- Titles & Name -->
-            <div class="space-y-1">
-              <span class="inline-block px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase bg-amber-400 text-slate-950 shadow-xs">
-                👑 {{ lang === 'ar' ? chairman.title_ar : chairman.title_en }}
+            <div class="space-y-1 flex-1">
+              <span 
+                class="inline-block px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase shadow-xs"
+                :class="member.position_key === 'chairman' ? 'bg-amber-400 text-slate-950' : 'bg-blue-400 text-slate-950'"
+              >
+                {{ member.position_key === 'chairman' ? '👑 ' : '⭐ ' }}{{ lang === 'ar' ? member.title_ar : member.title_en }}
               </span>
               <h3 class="text-xl sm:text-2xl font-black text-white pt-1">
-                {{ lang === 'ar' ? (chairman.name_ar || chairman.name_en) : (chairman.name_en || chairman.name_ar) }}
+                {{ lang === 'ar' ? (member.name_ar || member.name_en) : (member.name_en || member.name_ar) }}
               </h3>
               <p class="text-xs text-blue-200 line-clamp-2 pt-1 font-normal max-w-sm mx-auto">
-                {{ lang === 'ar' ? chairman.bio_ar : chairman.bio_en }}
+                {{ lang === 'ar' ? member.bio_ar : member.bio_en }}
               </p>
             </div>
 
             <!-- Social Links -->
             <div class="flex items-center justify-center gap-3 pt-2 text-white/80">
               <a 
-                v-if="chairman.linkedin_url" 
-                :href="chairman.linkedin_url" 
+                v-if="member.linkedin_url" 
+                :href="member.linkedin_url" 
                 target="_blank" 
                 @click.stop
                 class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                title="LinkedIn"
               >
                 <Linkedin class="w-4 h-4" />
               </a>
               <a 
-                v-if="chairman.email_public" 
-                :href="'mailto:' + chairman.email_public" 
+                v-if="member.email_public" 
+                :href="'mailto:' + member.email_public" 
                 @click.stop
                 class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                title="Email"
               >
                 <Mail class="w-4 h-4" />
               </a>
@@ -128,16 +135,16 @@
           </div>
         </div>
 
-        <!-- 2. Other 4 Office Members (Vice Chair, Secretary, Treasurer, HR) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- 2. Remaining 3 Office Members: Secretary, Treasurer, HR (Row 2 - 3 Columns) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           <div 
-            v-for="member in remainingOffice" 
+            v-for="member in remainingThreeOffice" 
             :key="member.position_id"
             @click="openMemberModal(member)"
-            class="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-700 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 text-center space-y-4 cursor-pointer group"
+            class="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-700 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 text-center space-y-4 cursor-pointer group flex flex-col justify-between"
           >
             <!-- Photo or Fallback Avatar -->
-            <div class="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-600 shadow-sm group-hover:scale-105 transition-transform duration-300 bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+            <div class="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-600 shadow-sm group-hover:scale-105 transition-transform duration-300 bg-slate-100 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
               <img 
                 v-if="member.photo_path" 
                 :src="resolvePhoto(member.photo_path)" 
@@ -149,7 +156,7 @@
             </div>
 
             <!-- Details -->
-            <div class="space-y-1">
+            <div class="space-y-1 flex-1">
               <span class="inline-block px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300">
                 {{ lang === 'ar' ? member.title_ar : member.title_en }}
               </span>
@@ -168,7 +175,8 @@
                 :href="member.linkedin_url" 
                 target="_blank" 
                 @click.stop
-                class="p-1.5 hover:text-blue-600 transition-colors"
+                class="p-1.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                title="LinkedIn"
               >
                 <Linkedin class="w-4 h-4" />
               </a>
@@ -176,7 +184,8 @@
                 v-if="member.email_public" 
                 :href="'mailto:' + member.email_public" 
                 @click.stop
-                class="p-1.5 hover:text-blue-600 transition-colors"
+                class="p-1.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                title="Email"
               >
                 <Mail class="w-4 h-4" />
               </a>
@@ -365,12 +374,18 @@ function switchTerm(termId) {
   loadTeamData(termId);
 }
 
-const chairman = computed(() => {
-  return officeMembers.value.find(m => m.position_key === 'chairman') || officeMembers.value[0] || null;
+const topTwoOffice = computed(() => {
+  const chair = officeMembers.value.find(m => m.position_key === 'chairman') || officeMembers.value[0];
+  const vice = officeMembers.value.find(m => m.position_key === 'vice_chair') || officeMembers.value[1];
+  const list = [];
+  if (chair) list.push(chair);
+  if (vice && vice !== chair) list.push(vice);
+  return list;
 });
 
-const remainingOffice = computed(() => {
-  return officeMembers.value.filter(m => m.position_key !== 'chairman');
+const remainingThreeOffice = computed(() => {
+  const topKeys = ['chairman', 'vice_chair'];
+  return officeMembers.value.filter(m => !topKeys.includes(m.position_key));
 });
 
 function openMemberModal(member) {
