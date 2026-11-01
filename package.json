@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "node -e \"const fs = require('fs'); if (!fs.existsSync('dist/uploads')) { try { require('child_process').execSync('cmd /c mklink /J dist\\\\uploads uploads'); } catch(e){} }\"",
+    "postbuild": "node -e \"const fs = require('fs'), path = require('path'); const dest = path.join('dist', 'uploads'); if (!fs.existsSync(dest)) { if (process.platform === 'win32') { try { fs.symlinkSync(path.resolve('uploads'), dest, 'junction'); } catch (e) { fs.mkdirSync(dest, { recursive: true }); } } else { fs.mkdirSync(dest, { recursive: true }); } }\"",
     "preview": "vite preview"
   },
   "dependencies": {
